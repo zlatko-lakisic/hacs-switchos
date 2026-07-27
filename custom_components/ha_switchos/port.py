@@ -54,8 +54,10 @@ class Port:
     @property
     def speed(self) -> str | None:
         """Return negotiated/current link speed label."""
+        if self.link_up is False:
+            return None
         # On SwOS, spd is actual speed (man_speed in python-switchos).
-        # On SwOS Lite, i08 is closer to operational speed (speed field).
+        # On SwOS Lite, speed/i08 is closer to operational speed.
         candidates = (
             getattr(self.link_info, "man_speed", None),
             getattr(self.link_info, "speed", None),
@@ -67,7 +69,9 @@ class Port:
             if isinstance(value, str):
                 return value
             if isinstance(value, int):
-                return speed_label(value)
+                label = speed_label(value)
+                if label is not None:
+                    return label
         return None
 
     @property
