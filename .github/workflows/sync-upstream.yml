@@ -1,0 +1,66 @@
+name: Sync upstream
+
+on:
+  schedule:
+    - cron: "23 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    name: Open PR from upstream/main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out fork
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream https://github.com/probert94/ha-switchos.git
+          git fetch upstream main
+          git fetch origin main
+
+      - name: Create sync branch and PR when needed
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if git merge-base --is-ancestor upstream/main origin/main; then
+            echo "Already contains upstream/main — nothing to sync"
+            exit 0
+          fi
+
+          BRANCH="sync/upstream-$(date -u +%Y%m%d)"
+          git checkout -B "$BRANCH" origin/main
+          if git merge --no-edit upstream/main; then
+            if git diff --quiet origin/main..HEAD; then
+              echo "Merge produced no changes — nothing to open"
+              exit 0
+            fi
+            git push -u origin "$BRANCH" --force-with-lease
+            if gh pr list --head "$BRANCH" --json number --jq 'length' | grep -qx '0'; then
+              gh pr create \
+                --base main \
+                --head "$BRANCH" \
+                --title "chore: sync upstream probert94/ha-switchos" \
+                --body "$(cat <<'EOF'
+          ## Summary
+          Automated sync from upstream `probert94/ha-switchos` `main`.
+
+          Review carefully for conflicts with fork-maintained SwitchOS control features (port switches, stats, PoE, hosts, reboot).
+          EOF
+          )"
+            else
+              echo "PR already exists for $BRANCH"
+            fi
+          else
+            echo "Merge conflict with upstream — manual resolution required"
+            git merge --abort || true
+            exit 1
+          fi

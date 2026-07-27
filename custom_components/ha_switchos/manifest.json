@@ -2,11 +2,11 @@
   "domain": "mikrotik_switchos",
   "name": "Mikrotik SwitchOS",
   "codeowners": [
-    "@probert94"
+    "@zlatko-lakisic"
   ],
-  "documentation": "https://github.com/probert94/ha-switchos",
-  "issue_tracker": "https://github.com/probert94/ha-switchos/issues",
-  "version": "0.0.9",
+  "documentation": "https://github.com/zlatko-lakisic/hacs-switchos",
+  "issue_tracker": "https://github.com/zlatko-lakisic/hacs-switchos/issues",
+  "version": "0.1.0",
   "config_flow": true,
   "integration_type": "device",
   "iot_class": "local_polling",

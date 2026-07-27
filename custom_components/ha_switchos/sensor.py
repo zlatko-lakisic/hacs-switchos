@@ -12,22 +12,23 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import (
+    UnitOfDataRate,
     UnitOfElectricCurrent,
     UnitOfElectricPotential,
+    UnitOfInformation,
     UnitOfPower,
     UnitOfTemperature,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import ATTR_MANUFACTURER, DOMAIN
 from .coordinator import (
     MikrotikSwitchOSConfigEntry,
     MikrotikSwitchOSCoordinator,
     MikrotikSwitchOSData,
 )
+from .entity import device_info
 from .port import Port
 
 
@@ -38,6 +39,14 @@ class MikrotikSwitchOSEntityDescription(SensorEntityDescription):
     endpoint: str
     property: str
     enabled_by_default: Callable[[MikrotikSwitchOSData], bool] | None = None
+
+
+@dataclass(frozen=True, kw_only=True)
+class MikrotikPortSensorDescription(SensorEntityDescription):
+    """Describes a per-port sensor."""
+
+    value_fn: Callable[[Port], float | int | str | None]
+    available_fn: Callable[[Port], bool] = lambda port: True
 
 
 GLOBAL_SENSORS: tuple[MikrotikSwitchOSEntityDescription, ...] = (
@@ -163,6 +172,57 @@ PORT_SENSORS: tuple[MikrotikSwitchOSEntityDescription, ...] = (
     ),
 )
 
+PORT_STATS_SENSORS: tuple[MikrotikPortSensorDescription, ...] = (
+    MikrotikPortSensorDescription(
+        key="link_speed",
+        translation_key="link_speed",
+        icon="mdi:speedometer",
+        value_fn=lambda port: port.speed,
+    ),
+    MikrotikPortSensorDescription(
+        key="rx_rate",
+        translation_key="rx_rate",
+        device_class=SensorDeviceClass.DATA_RATE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfDataRate.MEGABITS_PER_SECOND,
+        suggested_display_precision=2,
+        value_fn=lambda port: port.stats.rx_rate_mbps if port.stats else None,
+        available_fn=lambda port: bool(port.stats),
+    ),
+    MikrotikPortSensorDescription(
+        key="tx_rate",
+        translation_key="tx_rate",
+        device_class=SensorDeviceClass.DATA_RATE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfDataRate.MEGABITS_PER_SECOND,
+        suggested_display_precision=2,
+        value_fn=lambda port: port.stats.tx_rate_mbps if port.stats else None,
+        available_fn=lambda port: bool(port.stats),
+    ),
+    MikrotikPortSensorDescription(
+        key="rx_bytes",
+        translation_key="rx_bytes",
+        device_class=SensorDeviceClass.DATA_SIZE,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        native_unit_of_measurement=UnitOfInformation.BYTES,
+        suggested_display_precision=0,
+        entity_registry_enabled_default=False,
+        value_fn=lambda port: port.stats.rx_bytes if port.stats else None,
+        available_fn=lambda port: bool(port.stats),
+    ),
+    MikrotikPortSensorDescription(
+        key="tx_bytes",
+        translation_key="tx_bytes",
+        device_class=SensorDeviceClass.DATA_SIZE,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        native_unit_of_measurement=UnitOfInformation.BYTES,
+        suggested_display_precision=0,
+        entity_registry_enabled_default=False,
+        value_fn=lambda port: port.stats.tx_bytes if port.stats else None,
+        available_fn=lambda port: bool(port.stats),
+    ),
+)
+
 
 async def async_setup_entry(
     _: HomeAssistant,
@@ -171,16 +231,7 @@ async def async_setup_entry(
 ) -> None:
     """Setup sensor for Mikrotik SwitchOS component."""
     coordinator = config_entry.runtime_data
-
-    device = {
-        "identifiers": {(DOMAIN, coordinator.serial_num)},
-        "connections": {("mac", coordinator.mac)},
-        "manufacturer": ATTR_MANUFACTURER,
-        "model": coordinator.model,
-        "name": coordinator.identity,
-        "serial_number": coordinator.serial_num,
-        "sw_version": coordinator.firmware,
-    }
+    device = device_info(coordinator)
 
     async_add_entities(
         [
@@ -195,6 +246,14 @@ async def async_setup_entry(
             for port_sensor in PORT_SENSORS
             for port in coordinator.api.ports
             if _port_entity_exists(port_sensor, coordinator.api, port)
+        ]
+    )
+    async_add_entities(
+        [
+            MikrotikPortStatsSensor(coordinator, device, description, port)
+            for description in PORT_STATS_SENSORS
+            for port in coordinator.api.ports
+            if description.key == "link_speed" or description.available_fn(port)
         ]
     )
 
@@ -225,17 +284,17 @@ class MikrotikSwitchOSSensor(
     """Representation of a Mikrotik SwitchOS Sensor."""
 
     entity_description: MikrotikSwitchOSEntityDescription
+    _attr_has_entity_name = True
 
     def __init__(
         self,
         coordinator: MikrotikSwitchOSCoordinator,
-        device: DeviceInfo,
+        device,
         entity_description: MikrotikSwitchOSEntityDescription,
     ) -> None:
         """Initialize the sensor entity."""
         super().__init__(coordinator)
         self.entity_description = entity_description
-        self.has_entity_name = True
         self._attr_unique_id = f"{coordinator.serial_num}_{entity_description.key}"
         self._attr_device_info = device
 
@@ -264,7 +323,7 @@ class MikrotikSwitchOSPortSensor(MikrotikSwitchOSSensor):
     def __init__(
         self,
         coordinator: MikrotikSwitchOSCoordinator,
-        device: DeviceInfo,
+        device,
         entity_description: MikrotikSwitchOSEntityDescription,
         port: Port,
     ) -> None:
@@ -286,3 +345,46 @@ class MikrotikSwitchOSPortSensor(MikrotikSwitchOSSensor):
             getattr(self.coordinator.api, self.entity_description.endpoint),
             self.entity_description.property,
         )[self.port.num]
+
+
+class MikrotikPortStatsSensor(
+    CoordinatorEntity[MikrotikSwitchOSCoordinator], SensorEntity
+):
+    """Per-port stats/speed sensor."""
+
+    entity_description: MikrotikPortSensorDescription
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinator: MikrotikSwitchOSCoordinator,
+        device,
+        entity_description: MikrotikPortSensorDescription,
+        port: Port,
+    ) -> None:
+        """Initialize the stats sensor."""
+        super().__init__(coordinator)
+        self.entity_description = entity_description
+        self.port_num = port.num
+        self._attr_translation_placeholders = {
+            "port_num": f"{(port.num + 1):02d}",
+            "port_name": port.name,
+        }
+        self._attr_unique_id = (
+            f"{coordinator.serial_num}_{port.num}_{entity_description.key}"
+        )
+        self._attr_device_info = device
+
+    @property
+    def _port(self) -> Port:
+        return self.coordinator.api.ports[self.port_num]
+
+    @property
+    def available(self) -> bool:
+        """Return if entity is available."""
+        return super().available and self.entity_description.available_fn(self._port)
+
+    @property
+    def native_value(self) -> float | int | str | None:
+        """Return the sensor value."""
+        return self.entity_description.value_fn(self._port)

@@ -1,51 +1,62 @@
 # Home Assistant Integration - Mikrotik SwitchOS
 
-Home Assistant integration for Mikrotik SwitchOS and SwitchOS Lite
+Home Assistant integration for Mikrotik SwitchOS and SwitchOS Lite.
 
-[![Static Badge](https://img.shields.io/badge/HACS-Custom-41BDF5?style=for-the-badge&logo=homeassistantcommunitystore&logoColor=white)](https://github.com/hacs/integration) 
-![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/probert94/ha-switchos/total?style=for-the-badge)
-![GitHub Issues or Pull Requests](https://img.shields.io/github/issues/probert94/ha-switchos?style=for-the-badge)
-[![GitHub Release](https://img.shields.io/github/v/release/probert94/ha-switchos?style=for-the-badge)](https://github.com/probert94/ha-switchos/releases)
+This is a maintained fork of [probert94/ha-switchos](https://github.com/probert94/ha-switchos) with RouterOS-like monitoring and control over the SwitchOS HTTP `.b` API (not SNMP).
+
+[![Static Badge](https://img.shields.io/badge/HACS-Custom-41BDF5?style=for-the-badge&logo=homeassistantcommunitystore&logoColor=white)](https://github.com/hacs/integration)
 
 ## HACS install
-To install the integration in your Home Assistant instance, use this My button:
 
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=probert94&repository=ha-switchos&category=Integration)
-
-Alternatively, you can add it to HACS by following this steps:
-1. Go to HACS
-2. Click on the 3 points in the upper right corner and click `Custom repositories`
-3. Paste https://github.com/probert94/ha-switchos into `Repository` and select type `Integration`
-4. Click `ADD` and check if the repository can be found in HACS
-5. Select it and click `INSTALL`
+1. Go to HACS → ⋮ → Custom repositories
+2. Add `https://github.com/zlatko-lakisic/hacs-switchos` as type **Integration**
+3. Install **Mikrotik SwitchOS**, then restart Home Assistant
 
 ## Configuration
 
-1. After installing the integration use this My button to add it to your Home Assistant instance:
-
-    [![Open your Home Assistant instance and add an integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start?domain=mikrotik_switchos)
-
-    Alternatively, go to Settings -> Devices & Services in Home Assistance, click `ADD INTEGRATION`, search for "Mikrotik SwitchOS" and install it.
-
-2. In the configuration dialog enter the following details:
-    - Host: The address of the Mikrotik SwitchOS device (e.g. `http://192.168.1.2`)
-    - Username: The __case sensitive__ username, defaults to _admin_ (cannot be changed in current SwitchOS versions)
-    - Password: The password
+1. Settings → Devices & Services → Add Integration → **Mikrotik SwitchOS**
+2. Enter:
+   - Host: e.g. `http://192.168.1.2`
+   - Username: `admin` (case sensitive; fixed on current SwitchOS)
+   - Password: switch password
 
 ## Features
 
-The integration displays model, firmware, serial number and MAC address of the SwitchOS device.  
-It also reads information about the ports, including the customized name which is then used for the entities.
+### Device
+- Identity, model, firmware, serial, MAC
+- Reboot button
 
-### Sensors
-- PoE power
-- PoE current
-- PoE voltage
+### Ports
+- Enable / disable each port (switch)
+- Link up / down (binary sensor)
+- Negotiated speed
+- RX / TX rate (Mbps)
+- RX / TX byte counters (disabled by default)
 
-### Compatibility
+### PoE (when supported by hardware)
+- Per-port PoE power / current / voltage sensors
+- Per-port PoE on/off switch (off ↔ auto)
+- PSU / total power sensors when available
 
-The integration has been tested with:
+### Hosts
+- Device tracker entities for MACs learned on `!dhost.b`
+
+## Compatibility
+
+Tested with:
+
 | Model | OS | Versions |
 | - | - | - |
+| CSS326-24G-2S+ | SwitchOS | 2.18 |
 | CRS326-24G-2S+ | SwitchOS | 2.18 |
 | CSS610-8P-2S+ | SwitchOS Lite | 2.20, 2.21 |
+
+## Notes
+
+- SwitchOS has no official API, CLI, or SNMP write support. This integration uses the same digest-auth HTTP endpoints as the web UI.
+- Writes use read-modify-write of the full writable endpoint payload (MikroTik web UI behavior).
+- Upstream sync PRs are opened automatically when `probert94/ha-switchos` advances.
+
+## License
+
+MIT (see `LICENSE`).
