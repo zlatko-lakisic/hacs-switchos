@@ -19,6 +19,21 @@
         }
     },
     "entity": {
+        "binary_sensor": {
+            "link": {
+                "name": "P{port_num} - {port_name} Link"
+            }
+        },
+        "button": {
+            "reboot": {
+                "name": "Reboot"
+            }
+        },
+        "device_tracker": {
+            "host": {
+                "name": "Host"
+            }
+        },
         "sensor": {
             "cpu_temperature": {
                 "name": "CPU temperature"
@@ -52,6 +67,29 @@
             },
             "poe_voltage": {
                 "name": "P{port_num} - {port_name} Voltage"
+            },
+            "link_speed": {
+                "name": "P{port_num} - {port_name} Speed"
+            },
+            "rx_rate": {
+                "name": "P{port_num} - {port_name} RX rate"
+            },
+            "tx_rate": {
+                "name": "P{port_num} - {port_name} TX rate"
+            },
+            "rx_bytes": {
+                "name": "P{port_num} - {port_name} RX bytes"
+            },
+            "tx_bytes": {
+                "name": "P{port_num} - {port_name} TX bytes"
+            }
+        },
+        "switch": {
+            "port_enabled": {
+                "name": "P{port_num} - {port_name}"
+            },
+            "poe_enabled": {
+                "name": "P{port_num} - {port_name} PoE"
             }
         }
     }

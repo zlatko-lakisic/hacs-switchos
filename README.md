@@ -2,10 +2,12 @@
 
 Home Assistant integration for Mikrotik SwitchOS and SwitchOS Lite
 
-[![Static Badge](https://img.shields.io/badge/HACS-Custom-41BDF5?style=for-the-badge&logo=homeassistantcommunitystore&logoColor=white)](https://github.com/hacs/integration) 
+[![Static Badge](https://img.shields.io/badge/HACS-Custom-41BDF5?style=for-the-badge&logo=homeassistantcommunitystore&logoColor=white)](https://github.com/hacs/integration)
 ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/probert94/ha-switchos/total?style=for-the-badge)
 ![GitHub Issues or Pull Requests](https://img.shields.io/github/issues/probert94/ha-switchos?style=for-the-badge)
 [![GitHub Release](https://img.shields.io/github/v/release/probert94/ha-switchos?style=for-the-badge)](https://github.com/probert94/ha-switchos/releases)
+
+Uses the SwitchOS web UI HTTP `.b` API (digest auth) — **not SNMP**. SwitchOS has no official CLI, REST, or RouterOS API.
 
 ## HACS install
 To install the integration in your Home Assistant instance, use this My button:
@@ -31,21 +33,49 @@ Alternatively, you can add it to HACS by following this steps:
     - Host: The address of the Mikrotik SwitchOS device (e.g. `http://192.168.1.2`)
     - Username: The __case sensitive__ username, defaults to _admin_ (cannot be changed in current SwitchOS versions)
     - Password: The password
+    - Scan interval: Optional (default 10 seconds)
 
 ## Features
 
-The integration displays model, firmware, serial number and MAC address of the SwitchOS device.  
+The integration displays model, firmware, serial number and MAC address of the SwitchOS device.
 It also reads information about the ports, including the customized name which is then used for the entities.
 
-### Sensors
-- PoE power
-- PoE current
-- PoE voltage
+### Device
+- Identity, model, firmware, serial number, MAC
+- CPU temperature (when exposed by the switch)
+- Reboot button
 
-### Compatibility
+### Ports
+- Switch entities to administratively enable / disable each port
+- Binary sensors for link up / down (with speed, duplex, enabled attributes)
+- Sensors for negotiated link speed (hidden when the port has no link)
+- Sensors for RX / TX rate (Mbit/s)
+- Sensors for RX / TX byte counters (disabled by default in the entity registry)
+
+### PoE (hardware-dependent)
+- Per-port power, current, and voltage sensors
+- Per-port PoE switch (off ↔ auto)
+- PSU / total power sensors when available
+
+### Hosts
+- Device tracker entities for MACs learned from `!dhost.b` (port + VLAN attributes)
+
+## Compatibility
 
 The integration has been tested with:
 | Model | OS | Versions |
 | - | - | - |
+| CSS326-24G-2S+ | SwitchOS | 2.18 |
 | CRS326-24G-2S+ | SwitchOS | 2.18 |
 | CSS610-8P-2S+ | SwitchOS Lite | 2.20, 2.21 |
+
+Other SwitchOS / SwitchOS Lite models should work; field names differ slightly between SwOS and SwOS Lite and are handled by the client layer.
+
+## How it talks to the switch
+
+- **Read:** `sys.b`, `link.b`, `stats.b`, `poe.b` (if present), `!dhost.b`
+- **Write:** `link.b` (port enable), `poe.b` (PoE mode), `reboot`
+- Auth: HTTP Digest over plain HTTP (same as the web UI — use a management VLAN / trusted network)
+- Writes use read-modify-write of the full writable endpoint payload (MikroTik web UI behavior)
+
+SNMP on SwitchOS is read-only and is **not** used by this integration.

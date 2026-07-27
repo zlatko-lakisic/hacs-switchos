@@ -8,7 +8,13 @@ from homeassistant.core import HomeAssistant
 
 from .coordinator import MikrotikSwitchOSConfigEntry, MikrotikSwitchOSCoordinator
 
-_PLATFORMS: list[Platform] = [Platform.SENSOR]
+_PLATFORMS: list[Platform] = [
+    Platform.BINARY_SENSOR,
+    Platform.BUTTON,
+    Platform.DEVICE_TRACKER,
+    Platform.SENSOR,
+    Platform.SWITCH,
+]
 
 
 async def async_setup_entry(
